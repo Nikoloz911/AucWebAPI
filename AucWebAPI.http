@@ -1,0 +1,6 @@
+@AucWebAPI_HostAddress = http://localhost:5263
+
+GET {{AucWebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
