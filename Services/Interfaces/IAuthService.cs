@@ -8,7 +8,8 @@ public interface IAuthService
      Task<ApiResponse<LoginResponseDTO>> LoginAsync(LoginDTO dto);
     Task<ApiResponse<string>> VerifyEmailAsync(string email, string code);
     Task<ApiResponse<string>> ResendVerificationCodeAsync(string email);
-
     Task<ApiResponse<string>> ForgotPasswordAsync(string email);
     Task<ApiResponse<string>> ResetPasswordAsync(string email, string code, string newPassword);
+    Task<ApiResponse<GetUserDTO>> GetUserProfileAsync(int id);
+    Task<ApiResponse<UpdateUserResponseDTO>> UpdateUserAsync(int id, UpdateUserDTO dto);
 }

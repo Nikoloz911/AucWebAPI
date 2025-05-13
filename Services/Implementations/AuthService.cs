@@ -32,7 +32,8 @@ namespace AucWebAPI.Services.Implementations
             _jwtService = jwtService;
         }
 
-
+        // REGISTER
+        // REGISTER
         public async Task<ApiResponse<RegisterUserResponseDTO>> RegisterUserAsync(
             RegisterUserDTO dto
         )
@@ -66,7 +67,10 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-            if (!dto.Email.Contains("@") || !dto.Email.EndsWith(".com", StringComparison.OrdinalIgnoreCase))
+            if (
+                !dto.Email.Contains("@")
+                || !dto.Email.EndsWith(".com", StringComparison.OrdinalIgnoreCase)
+            )
             {
                 return new ApiResponse<RegisterUserResponseDTO>
                 {
@@ -76,12 +80,10 @@ namespace AucWebAPI.Services.Implementations
                 };
             }
 
-
             var registerUser = _mapper.Map<RegisterUser>(dto);
             registerUser.Role = parsedRole;
             registerUser.RegistrationDate = DateTime.UtcNow;
             registerUser.IsEmailConfirmed = false;
-
             using var hmac = new HMACSHA256();
             registerUser.Salt = Convert.ToBase64String(hmac.Key);
             var passwordBytes = Encoding.UTF8.GetBytes(dto.Password);
@@ -111,6 +113,8 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
+        // LOGIN
+        // LOGIN
         public async Task<ApiResponse<LoginResponseDTO>> LoginAsync(LoginDTO dto)
         {
             User user = null;
@@ -176,9 +180,8 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
-
-
-
+        // VERIFY EMAIL
+        // VERIFY EMAIL
         public async Task<ApiResponse<string>> VerifyEmailAsync(string email, string code)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -232,8 +235,8 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
-
-
+        // RESEND VERIFICATION CODE
+        // RESEND VERIFICATION CODE
         public async Task<ApiResponse<string>> ResendVerificationCodeAsync(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -276,8 +279,8 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
-
-
+        // SEND FORGOT PASSWORD CODE
+        // SEND FORGOT PASSWORD CODE
         public async Task<ApiResponse<string>> ForgotPasswordAsync(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -295,12 +298,7 @@ namespace AucWebAPI.Services.Implementations
             string resetCode = SMTP_Registration.GenerateVerificationCode();
             _verificationCodes[email] = (resetCode, DateTime.UtcNow.AddMinutes(5));
 
-            SMTP_ResetPassword.EmailSender(
-                user.Email,
-                user.FirstName,
-                user.LastName,
-                resetCode
-            );
+            SMTP_ResetPassword.EmailSender(user.Email, user.FirstName, user.LastName, resetCode);
 
             return new ApiResponse<string>
             {
@@ -310,10 +308,13 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
-
-
-
-        public async Task<ApiResponse<string>> ResetPasswordAsync(string email, string code, string newPassword)
+        // RESET PASSWORD
+        // RESET PASSWORD
+        public async Task<ApiResponse<string>> ResetPasswordAsync(
+            string email,
+            string code,
+            string newPassword
+        )
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
@@ -326,12 +327,13 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-            if(user.IsEmailConfirmed == false)
+            if (user.IsEmailConfirmed == false)
             {
                 return new ApiResponse<string>
                 {
                     Status = StatusCodes.Status401Unauthorized,
-                    Message = "Email not verified. Please verify your email before resetting the password.",
+                    Message =
+                        "Email not verified. Please verify your email before resetting the password.",
                     Data = null,
                 };
             }
@@ -347,7 +349,6 @@ namespace AucWebAPI.Services.Implementations
             }
 
             var (storedCode, expiry) = codeData;
-
             if (storedCode != code)
             {
                 return new ApiResponse<string>
@@ -382,8 +383,86 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
+        // GET USER BY ID
+        // GET USER BY ID
+        public async Task<ApiResponse<GetUserDTO>> GetUserProfileAsync(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return new ApiResponse<GetUserDTO>
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Message = "User not found",
+                    Data = null,
+                };
+            }
 
+            var userDTO = _mapper.Map<GetUserDTO>(user);
 
+            return new ApiResponse<GetUserDTO>
+            {
+                Status = StatusCodes.Status200OK,
+                Message = "User profile retrieved successfully",
+                Data = userDTO,
+            };
+        }
 
+        // UPDATE USER BY ID
+        // UPDATE USER BY ID
+        public async Task<ApiResponse<UpdateUserResponseDTO>> UpdateUserAsync(
+            int id,
+            UpdateUserDTO dto
+        )
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return new ApiResponse<UpdateUserResponseDTO>
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Message = "User not found",
+                    Data = null,
+                };
+            }
+
+            var existingUserByUsername = await _context
+                .Users.Where(u => u.Id != id && u.UserName == dto.UserName)
+                .FirstOrDefaultAsync();
+
+            if (existingUserByUsername != null)
+            {
+                return new ApiResponse<UpdateUserResponseDTO>
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Message = "Username is already taken by another user",
+                    Data = null,
+                };
+            }
+
+            var existingUserByEmail = await _context
+                .Users.Where(u => u.Id != id && u.Email == dto.Email)
+                .FirstOrDefaultAsync();
+
+            if (existingUserByEmail != null)
+            {
+                return new ApiResponse<UpdateUserResponseDTO>
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Message = "Email is already registered by another user",
+                    Data = null,
+                };
+            }
+
+            _mapper.Map(dto, user);
+            await _context.SaveChangesAsync();
+            var responseDto = _mapper.Map<UpdateUserResponseDTO>(user);
+            return new ApiResponse<UpdateUserResponseDTO>
+            {
+                Status = StatusCodes.Status200OK,
+                Message = "User updated successfully",
+                Data = responseDto,
+            };
+        }
     }
 }
