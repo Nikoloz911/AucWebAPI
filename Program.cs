@@ -32,7 +32,7 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = "MediCore",
+        ValidIssuer = "Auc WebAPI",
         ValidAudience = "application",
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };

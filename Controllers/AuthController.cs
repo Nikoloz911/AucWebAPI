@@ -31,4 +31,34 @@ public class AuthController : ControllerBase
         var response = await _authService.LoginAsync(loginDto);
         return StatusCode(response.Status, response); 
     }
+
+
+    [HttpGet("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromQuery] string email, [FromQuery] string code)
+    {
+        var result = await _authService.VerifyEmailAsync(email, code);
+        return StatusCode(result.Status, result);
+    }
+
+    [HttpGet("resend-verification")]
+    public async Task<IActionResult> ResendVerification([FromQuery] string email)
+    {
+        var result = await _authService.ResendVerificationCodeAsync(email);
+        return StatusCode(result.Status, result);
+    }
+
+    [HttpGet("forgot-password")]
+    public async Task<IActionResult> SendResetCode([FromQuery] string email)
+    {
+        var result = await _authService.ForgotPasswordAsync(email);
+        return StatusCode(result.Status, result);
+    }
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromForm] string email, [FromForm] string code, [FromForm] string newPassword)
+    {
+        var result = await _authService.ResetPasswordAsync(email, code, newPassword);
+        return StatusCode(result.Status, result);
+    }
+
+
 }
