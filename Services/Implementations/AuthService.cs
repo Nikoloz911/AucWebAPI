@@ -1,5 +1,8 @@
-﻿using System.Security.Cryptography;
+﻿using System;
+using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using AucWebAPI.Core;
 using AucWebAPI.Data;
 using AucWebAPI.DTOs.UserDTOs;
@@ -20,11 +23,6 @@ namespace AucWebAPI.Services.Implementations
         private readonly IMapper _mapper;
         private readonly DataContext _context;
         private readonly IJWTService _jwtService;
-        private static readonly Dictionary<
-            string,
-            (string code, DateTime expiry)
-        > _verificationCodes = new Dictionary<string, (string, DateTime)>();
-
         public AuthService(IMapper mapper, DataContext context, IJWTService jwtService)
         {
             _mapper = mapper;
@@ -92,15 +90,24 @@ namespace AucWebAPI.Services.Implementations
             var user = _mapper.Map<User>(registerUser);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            string verificationCode = SMTP_Registration.GenerateVerificationCode();
+            string verificationToken = SMTP_Registration.GenerateVerificationCode();
+            DateTime expirationDate = DateTime.UtcNow.AddMinutes(5);
 
-            _verificationCodes[user.Email] = (verificationCode, DateTime.UtcNow.AddMinutes(5));
+            var emailVerification = new EmailVerification
+            {
+                UserId = user.Id,
+                Token = verificationToken,
+                ExpirationDate = expirationDate,
+            };
+
+            _context.EmailVerifications.Add(emailVerification);
+            await _context.SaveChangesAsync();
 
             SMTP_Registration.EmailSender(
                 user.Email,
                 user.FirstName,
                 user.LastName,
-                verificationCode
+                verificationToken
             );
 
             var responseDto = _mapper.Map<RegisterUserResponseDTO>(user);
@@ -127,7 +134,6 @@ namespace AucWebAPI.Services.Implementations
             {
                 user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == dto.Identifier);
             }
-
             if (user == null)
             {
                 return new ApiResponse<LoginResponseDTO>
@@ -147,7 +153,6 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
             using var hmac = new HMACSHA256(Convert.FromBase64String(user.Salt));
             var passwordBytes = Encoding.UTF8.GetBytes(dto.Password);
             var hashedPassword = hmac.ComputeHash(passwordBytes);
@@ -162,9 +167,7 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
             var token = _jwtService.GetToken(user);
-
             var responseDto = new LoginResponseDTO
             {
                 UserToken = token.UserToken,
@@ -206,27 +209,43 @@ namespace AucWebAPI.Services.Implementations
                 };
             }
 
-            if (
-                !_verificationCodes.TryGetValue(email, out var codeData)
-                || codeData.code != code
-                || codeData.expiry < DateTime.UtcNow
-            )
+            var verification = await _context
+                .EmailVerifications.Where(v =>
+                    v.UserId == user.Id && v.Token == code && v.ExpirationDate > DateTime.UtcNow
+                )
+                .FirstOrDefaultAsync();
+
+            if (verification == null)
             {
+ 
+                var expiredVerification = await _context
+                    .EmailVerifications.Where(v =>
+                        v.UserId == user.Id
+                        && v.Token == code
+                        && v.ExpirationDate <= DateTime.UtcNow
+                    )
+                    .FirstOrDefaultAsync();
+
+                if (expiredVerification != null)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = StatusCodes.Status400BadRequest,
+                        Message = "Verification code expired. Please request a new one.",
+                        Data = null,
+                    };
+                }
+
                 return new ApiResponse<string>
                 {
                     Status = StatusCodes.Status400BadRequest,
-                    Message =
-                        codeData.expiry < DateTime.UtcNow
-                            ? "Verification code expired. Please request a new one."
-                            : "Invalid verification code",
+                    Message = "Invalid verification code",
                     Data = null,
                 };
             }
-
             user.IsEmailConfirmed = true;
+            _context.EmailVerifications.Remove(verification);
             await _context.SaveChangesAsync();
-
-            _verificationCodes.Remove(email);
             return new ApiResponse<string>
             {
                 Status = StatusCodes.Status200OK,
@@ -235,7 +254,6 @@ namespace AucWebAPI.Services.Implementations
             };
         }
 
-        // RESEND VERIFICATION CODE
         // RESEND VERIFICATION CODE
         public async Task<ApiResponse<string>> ResendVerificationCodeAsync(string email)
         {
@@ -261,14 +279,37 @@ namespace AucWebAPI.Services.Implementations
                 };
             }
 
-            string verificationCode = SMTP_Registration.GenerateVerificationCode();
-            _verificationCodes[email] = (verificationCode, DateTime.UtcNow.AddMinutes(5));
+            // Remove any existing verification tokens for this user
+            var existingVerifications = await _context
+                .EmailVerifications.Where(v => v.UserId == user.Id)
+                .ToListAsync();
 
+            if (existingVerifications.Any())
+            {
+                _context.EmailVerifications.RemoveRange(existingVerifications);
+            }
+
+            // Generate new verification token
+            string verificationToken = SMTP_Registration.GenerateVerificationCode();
+            DateTime expirationDate = DateTime.UtcNow.AddMinutes(5);
+
+            // Create and save new email verification record
+            var emailVerification = new EmailVerification
+            {
+                UserId = user.Id,
+                Token = verificationToken,
+                ExpirationDate = expirationDate,
+            };
+
+            _context.EmailVerifications.Add(emailVerification);
+            await _context.SaveChangesAsync();
+
+            // Send new verification email
             SMTP_Registration.EmailSender(
                 user.Email,
                 user.FirstName,
                 user.LastName,
-                verificationCode
+                verificationToken
             );
 
             return new ApiResponse<string>
@@ -284,7 +325,6 @@ namespace AucWebAPI.Services.Implementations
         public async Task<ApiResponse<string>> ForgotPasswordAsync(string email)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
             if (user == null)
             {
                 return new ApiResponse<string>
@@ -294,11 +334,25 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
+            var existingVerifications = await _context.EmailVerifications
+                .Where(v => v.UserId == user.Id)
+                .ToListAsync();
 
-            string resetCode = SMTP_Registration.GenerateVerificationCode();
-            _verificationCodes[email] = (resetCode, DateTime.UtcNow.AddMinutes(5));
-
-            SMTP_ResetPassword.EmailSender(user.Email, user.FirstName, user.LastName, resetCode);
+            if (existingVerifications.Any())
+            {
+                _context.EmailVerifications.RemoveRange(existingVerifications);
+            }
+            string resetToken = SMTP_Registration.GenerateVerificationCode();
+            DateTime expirationDate = DateTime.UtcNow.AddMinutes(5);
+            var emailVerification = new EmailVerification
+            {
+                UserId = user.Id,
+                Token = resetToken,
+                ExpirationDate = expirationDate
+            };
+            _context.EmailVerifications.Add(emailVerification);
+            await _context.SaveChangesAsync();
+            SMTP_ResetPassword.EmailSender(user.Email, user.FirstName, user.LastName, resetToken);
 
             return new ApiResponse<string>
             {
@@ -307,7 +361,6 @@ namespace AucWebAPI.Services.Implementations
                 Data = "A password reset code has been sent to your email",
             };
         }
-
         // RESET PASSWORD
         // RESET PASSWORD
         public async Task<ApiResponse<string>> ResetPasswordAsync(
@@ -317,7 +370,6 @@ namespace AucWebAPI.Services.Implementations
         )
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
             if (user is null)
             {
                 return new ApiResponse<string>
@@ -337,8 +389,10 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
-            if (!_verificationCodes.TryGetValue(email, out var codeData))
+            var verification = await _context.EmailVerifications
+                .Where(v => v.UserId == user.Id && v.Token == code)
+                .FirstOrDefaultAsync();
+            if (verification == null)
             {
                 return new ApiResponse<string>
                 {
@@ -347,9 +401,7 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
-            var (storedCode, expiry) = codeData;
-            if (storedCode != code)
+            if (verification.Token != code)
             {
                 return new ApiResponse<string>
                 {
@@ -359,9 +411,10 @@ namespace AucWebAPI.Services.Implementations
                 };
             }
 
-            if (expiry < DateTime.UtcNow)
+            if (verification.ExpirationDate < DateTime.UtcNow)
             {
-                _verificationCodes.Remove(email);
+                _context.EmailVerifications.Remove(verification);
+                await _context.SaveChangesAsync();
 
                 return new ApiResponse<string>
                 {
@@ -370,11 +423,13 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-            user.Password = BCrypt.Net.BCrypt.HashPassword(newPassword);
 
+            using var hmac = new HMACSHA256(Convert.FromBase64String(user.Salt));
+            var passwordBytes = Encoding.UTF8.GetBytes(newPassword);
+            var hashedPassword = hmac.ComputeHash(passwordBytes);
+            user.Password = Convert.ToBase64String(hashedPassword);
+            _context.EmailVerifications.Remove(verification);
             await _context.SaveChangesAsync();
-            _verificationCodes.Remove(email);
-
             return new ApiResponse<string>
             {
                 Status = StatusCodes.Status200OK,
