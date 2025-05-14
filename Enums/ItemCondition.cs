@@ -1,7 +1,7 @@
 ﻿namespace AucWebAPI.Enums;
 public enum ITEM_CONDITION
 {
-    New,
-    Used,
-    Refurbished
+    New = 1,
+    Used = 2,
+    Refurbished = 3
 }
