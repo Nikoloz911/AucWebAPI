@@ -6,4 +6,6 @@ namespace AucWebAPI.Controllers;
 [ApiController]
 public class BidController : ControllerBase
 {
+//    POST /api/bids - ახალი ბიდის დამატება
+//GET /api/bids/my - მომხმარებლის ბიდების მიღებ
 }
