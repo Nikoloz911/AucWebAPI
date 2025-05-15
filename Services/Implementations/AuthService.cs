@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using AucWebAPI.Core;
 using AucWebAPI.Data;
@@ -15,6 +16,7 @@ using AucWebAPI.SMTP;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace AucWebAPI.Services.Implementations
 {
@@ -23,11 +25,14 @@ namespace AucWebAPI.Services.Implementations
         private readonly IMapper _mapper;
         private readonly DataContext _context;
         private readonly IJWTService _jwtService;
-        public AuthService(IMapper mapper, DataContext context, IJWTService jwtService)
+        private readonly IDistributedCache _cache;
+        private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
+        public AuthService(IMapper mapper, DataContext context, IJWTService jwtService, IDistributedCache cache)
         {
             _mapper = mapper;
             _context = context;
             _jwtService = jwtService;
+            _cache = cache;
         }
 
         // REGISTER
@@ -442,6 +447,20 @@ namespace AucWebAPI.Services.Implementations
         // GET USER BY ID
         public async Task<ApiResponse<GetUserDTO>> GetUserProfileAsync(int id)
         {
+            string cacheKey = $"UserProfile_{id}";
+
+            var cachedUser = await _cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedUser))
+            {
+                var userFromCache = JsonSerializer.Deserialize<GetUserDTO>(cachedUser);
+                return new ApiResponse<GetUserDTO>
+                {
+                    Status = StatusCodes.Status200OK,
+                    Message = "User profile retrieved from cache",
+                    Data = userFromCache
+                };
+            }
+
             var user = await _context.Users.FindAsync(id);
             if (user == null)
             {
@@ -452,9 +471,12 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
             var userDTO = _mapper.Map<GetUserDTO>(user);
-
+            var serializedData = JsonSerializer.Serialize(userDTO);
+            await _cache.SetStringAsync(cacheKey, serializedData, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+            });
             return new ApiResponse<GetUserDTO>
             {
                 Status = StatusCodes.Status200OK,
