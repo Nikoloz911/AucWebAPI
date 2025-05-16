@@ -1,6 +1,6 @@
 ﻿using AucWebAPI.Enums;
-namespace AucWebAPI.Models;
-public class Auction
+namespace AucWebAPI.DTOs.AuctionDTOs;
+public class GetBidsAuctions
 {
     public int Id { get; set; }
     public int ItemId { get; set; }
@@ -9,8 +9,6 @@ public class Auction
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public AUCTION_STATUS Status { get; set; }
-    public int? WinnerId { get; set; }   
+    public int? WinnerId { get; set; }
     public decimal MinimumBidIncrement { get; set; }
-    public User Winner { get; set; }  
-    public Item Item { get; set; }
 }

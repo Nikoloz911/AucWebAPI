@@ -1,8 +1,8 @@
 ﻿namespace AucWebAPI.Enums;
 public enum AUCTION_STATUS
 {
-    Pending,
-    Active,
-    Closed,
-    Canceled,
+    Pending = 1,
+    Active = 2,
+    Closed = 3,
+    Canceled = 4,
 }
