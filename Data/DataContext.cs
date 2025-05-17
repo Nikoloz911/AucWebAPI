@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using AucWebAPI.Models;
-using AucWebAPI.Enums;
 
 namespace AucWebAPI.Data
 {
@@ -12,9 +11,9 @@ namespace AucWebAPI.Data
         public DbSet<Bid> Bids { get; set; }
         public DbSet<EmailVerification> EmailVerifications { get; set; }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)   /// MY AWS RDS CONNECTION STRING, GUESS PASSWORD
         {
-            optionsBuilder.UseSqlServer(@"Data Source=LENOVO\SQLEXPRESS01;Initial Catalog=Auction;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
+            optionsBuilder.UseSqlServer(@"Server=auctiondb.cbmyuy66ky0h.eu-north-1.rds.amazonaws.com,1433;Database=auctiondb;User ID=admin;Password=;Encrypt=True;TrustServerCertificate=true;Connection Timeout=30;");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
