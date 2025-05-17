@@ -8,7 +8,7 @@ namespace AucWebAPI.SMTP
         public static void EmailSender(string toAddress, string firstName, string lastName, string resetCode)
         {
             string senderEmail = "nikalobjanidze014@gmail.com";
-            string appPassword = "uqbo hbxk ikls pfmb"; // APP PASSWORD
+            string appPassword = ""; // APP PASSWORD
 
             string htmlContent = $@"
 <!DOCTYPE html>

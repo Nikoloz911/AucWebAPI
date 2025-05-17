@@ -14,7 +14,7 @@ public class SMTP_Registration
     public static void EmailSender(string ToAddress, string firstName, string lastName, string verificationCode)
     {
         string senderEmail = "nikalobjanidze014@gmail.com";
-        string appPassword = "uqbo hbxk ikls pfmb"; // APP PASSWORD 
+        string appPassword = ""; // APP PASSWORD 
 
         string htmlContent = $@"
 <!DOCTYPE html>
