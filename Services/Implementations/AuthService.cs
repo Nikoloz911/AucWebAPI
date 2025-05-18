@@ -283,8 +283,6 @@ namespace AucWebAPI.Services.Implementations
                     Data = null,
                 };
             }
-
-            // Remove any existing verification tokens for this user
             var existingVerifications = await _context
                 .EmailVerifications.Where(v => v.UserId == user.Id)
                 .ToListAsync();
@@ -293,12 +291,8 @@ namespace AucWebAPI.Services.Implementations
             {
                 _context.EmailVerifications.RemoveRange(existingVerifications);
             }
-
-            // Generate new verification token
             string verificationToken = SMTP_Registration.GenerateVerificationCode();
             DateTime expirationDate = DateTime.UtcNow.AddMinutes(5);
-
-            // Create and save new email verification record
             var emailVerification = new EmailVerification
             {
                 UserId = user.Id,
@@ -309,7 +303,6 @@ namespace AucWebAPI.Services.Implementations
             _context.EmailVerifications.Add(emailVerification);
             await _context.SaveChangesAsync();
 
-            // Send new verification email
             SMTP_Registration.EmailSender(
                 user.Email,
                 user.FirstName,
