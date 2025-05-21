@@ -11,9 +11,9 @@ namespace AucWebAPI.Data
         public DbSet<Bid> Bids { get; set; }
         public DbSet<EmailVerification> EmailVerifications { get; set; }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)   /// MY AWS RDS CONNECTION STRING, GUESS PASSWORD
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)   /// MY AWS RDS CONNECTION STRING
         {
-            optionsBuilder.UseSqlServer(@"Server=auctiondb.cbmyuy66ky0h.eu-north-1.rds.amazonaws.com,1433;Database=auctiondb;User ID=admin;Password=;Encrypt=True;TrustServerCertificate=true;Connection Timeout=30;");
+            optionsBuilder.UseSqlServer(@"");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
