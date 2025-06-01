@@ -13,7 +13,7 @@ namespace AucWebAPI.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)   /// MY AWS RDS CONNECTION STRING
         {
-            optionsBuilder.UseSqlServer(@"Server=database-auction.c3sawaum20mz.eu-north-1.rds.amazonaws.com,3306;Database=database-1;User ID=admin;Password=ItsFreeBro1%;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;");
+            optionsBuilder.UseSqlServer(@"Server=database-auction.c3sawaum20mz.eu-north-1.rds.amazonaws.com,1433;Database=database-auction;User ID=admin;Password=NOPE;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
